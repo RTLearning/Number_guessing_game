@@ -1,0 +1,123 @@
+#!/bin/bash
+
+PSQL="psql -X --username=freecodecamp --dbname=number_guess --tuples-only -c"
+
+MAIN_FUNCTION()
+{
+
+  #generate a random number btw 1 & 1000 -- moved this to the function guess_number
+  #NUMBER=$(( RANDOM % 1000 + 1 ))
+  #echo "The random number is $NUMBER"
+  echo "Enter your username:"
+  read USER_NAME
+  #echo -e "\nThe username your enetered is $USER_NAME"
+
+  USER_ID=$($PSQL "select user_id from users where user_name='$USER_NAME'")
+  # if user id  not available
+  if [[ -z $USER_ID ]]
+  then
+      echo "Welcome, $USER_NAME! It looks like this is your first time here."
+      #add the new user name into the table and fetch the new user id
+      INSERT_DETAILS=$($PSQL "insert into users(user_name,no_of_games,fewest_no_of_guess) values('$USER_NAME',0,0)")
+      #echo "$INSERT_DETAILS"
+      NEW_USER_ID=$($PSQL "select user_id from users where user_name='$USER_NAME'")
+      GUESS_NUMBER  0 $NEW_USER_ID
+  else
+  # if user id is available
+      GUESS_NUMBER $USER_ID
+  fi
+}
+
+GUESS_NUMBER()
+{
+  if [[ $1 > 0 ]]
+  then
+      USER_DETAILS=$($PSQL "select user_name,no_of_games,fewest_no_of_guess from users where user_id=$1")
+      echo "$USER_DETAILS" | while read USER_NAME BAR NO_OF_GAMES BAR FEWEST_GUESS
+      do
+        echo "Welcome back, $USER_NAME! You have played $NO_OF_GAMES games, and your best game took $FEWEST_GUESS guesses."
+      done
+      USER_ID=$1
+  elif [[ $1 == 0 ]]
+  then
+      USER_ID=$2
+  fi
+
+  #generate a random number btw 1 & 1000
+  
+  NUMBER=$(( RANDOM % 1000 + 1 ))
+
+  #get user input 
+  echo -e "\nGuess the secret number between 1 and 1000:"
+  read USER_INPUT
+  #User Input Validation
+  while [[ ! $USER_INPUT =~ ^[0-9]+$ ]]
+  do
+    echo "That is not an integer, guess again:"
+    read USER_INPUT
+  done
+  
+  
+  #This is where the user guessed number will be checked with the random number and repeated until
+  # they are correct and accordingly update the users table
+  COUNT=1
+  while [[ $USER_INPUT -ne $NUMBER ]]
+  do
+    #echo "The number you guessed is $USER_INPUT and the RANDOM Number is $NUMBER"
+    if [[ $USER_INPUT -lt $NUMBER ]]
+    then
+        echo "It's higher than that, guess again:"
+        read USER_INPUT
+        #User Input Validation
+        while [[ ! $USER_INPUT =~ ^[0-9]+$ ]]
+        do
+          echo "That is not an integer, guess again:"
+          read USER_INPUT
+        done
+    elif [[ $USER_INPUT -gt $NUMBER ]]
+    then
+        echo "It's lower than that, guess again:"
+        read USER_INPUT
+        #User Input Validation
+        while [[ ! $USER_INPUT =~ ^[0-9]+$ ]]
+        do
+          echo "That is not an integer, guess again:"
+          read USER_INPUT
+        done
+    fi
+    (( COUNT++ ))
+  done
+  
+  #once the numbers are matching, print the message and update the table accordingly
+  if [[ $USER_INPUT == $NUMBER ]]
+  then
+    echo "You guessed it in $COUNT tries. The secret number was $NUMBER. Nice job!"
+
+    
+    #if new user, update the users table for the user with 1 game played and the present count as the fewest guess
+    if [[ $1 == 0 ]]
+    then
+        UPDATE_USER=$($PSQL "update users set no_of_games=1, fewest_no_of_guess=$COUNT where user_id=$USER_ID")
+    else
+    #if existing user, update the variables and update the table
+        NO_OF_GAMES=$($PSQL "select no_of_games from users where user_id=$USER_ID")
+        FEWEST_GUESS=$($PSQL "select fewest_no_of_guess from users where user_id=$USER_ID")
+        (( NO_OF_GAMES++ ))
+        
+        if [[ $FEWEST_GUESS == 0 ]]
+        then
+          UPDATE_USER=$($PSQL "update users set no_of_games=$NO_OF_GAMES, fewest_no_of_guess=$COUNT where user_id=$USER_ID")
+        elif [[ $FEWEST_GUESS -lt $COUNT ]]
+        then
+          UPDATE_USER=$($PSQL "update users set no_of_games=$NO_OF_GAMES where user_id=$USER_ID")
+        elif [[ $FEWEST_GUESS -gt $COUNT ]]
+        then
+          UPDATE_USER=$($PSQL "update users set no_of_games=$NO_OF_GAMES, fewest_no_of_guess=$COUNT where user_id=$USER_ID")
+        fi
+    fi
+  fi
+
+}
+
+
+MAIN_FUNCTION

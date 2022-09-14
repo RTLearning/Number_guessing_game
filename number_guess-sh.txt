@@ -89,7 +89,7 @@ GUESS_NUMBER()
   done
   
   #once the numbers are matching, print the message and update the table accordingly
-  if [[ $USER_INPUT == $NUMBER ]]
+  if [[ $USER_INPUT -eq $NUMBER ]]
   then
     echo "You guessed it in $COUNT tries. The secret number was $NUMBER. Nice job!"
 
